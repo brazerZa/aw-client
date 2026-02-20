@@ -86,9 +86,21 @@ class ActivityWatchClient:
         server_config = _config["server" if not testing else "server-testing"]
         client_config = _config["client" if not testing else "client-testing"]
 
+        protocol = protocol or server_config.get("protocol", "http")
+        api_key = server_config.get("api_key", "")
+
         server_host = host or server_config["hostname"]
         server_port = port or server_config["port"]
-        self.server_address = f"{protocol}://{server_host}:{server_port}"
+        
+        # Clean up port if using standard ports
+        if (protocol == "https" and str(server_port) == "443") or (protocol == "http" and str(server_port) == "80"):
+            self.server_address = f"{protocol}://{server_host}"
+        else:
+            self.server_address = f"{protocol}://{server_host}:{server_port}"
+            
+        self.session = req.Session()
+        if api_key:
+            self.session.headers.update({"X-Api-Key": api_key})
 
         self.instance = SingleInstance(
             f"{self.client_name}-at-{server_host}-on-{server_port}"
@@ -109,7 +121,7 @@ class ActivityWatchClient:
 
     @always_raise_for_request_errors
     def _get(self, endpoint: str, params: Optional[dict] = None) -> req.Response:
-        return req.get(self._url(endpoint), params=params)
+        return self.session.get(self._url(endpoint), params=params)
 
     @always_raise_for_request_errors
     def _post(
@@ -119,7 +131,7 @@ class ActivityWatchClient:
         params: Optional[dict] = None,
     ) -> req.Response:
         headers = {"Content-type": "application/json", "charset": "utf-8"}
-        return req.post(
+        return self.session.post(
             self._url(endpoint),
             data=bytes(json.dumps(data), "utf8"),
             headers=headers,
@@ -131,7 +143,7 @@ class ActivityWatchClient:
         if data is None:
             data = {}
         headers = {"Content-type": "application/json"}
-        return req.delete(self._url(endpoint), data=json.dumps(data), headers=headers)
+        return self.session.delete(self._url(endpoint), data=json.dumps(data), headers=headers)
 
     def get_info(self):
         """Returns a dict currently containing the keys 'hostname' and 'testing'."""
