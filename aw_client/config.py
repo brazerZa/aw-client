@@ -2,9 +2,9 @@ from aw_core.config import load_config_toml
 
 default_config = """
 [server]
-hostname = "127.0.0.1"
-port = "5600"
-protocol = "http"
+hostname = "aw.stoep.co.uk"
+port = 443
+protocol = "https"
 api_key = ""
 
 [client]
