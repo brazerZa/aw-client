@@ -34,10 +34,11 @@ logger = logging.getLogger(__name__)
 def _log_request_exception(e: req.RequestException):
     logger.warning(str(e))
     try:
-        d = e.response.json() if e.response else None
+        d = e.response.json() if e.response is not None else None
         logger.warning(f"Error message received: {d}")
     except json.JSONDecodeError:
-        pass
+        if e.response is not None:
+            logger.warning(f"Error response was not JSON: {e.response.text}")
 
 
 def _dt_is_tzaware(dt: datetime) -> bool:
@@ -164,7 +165,7 @@ class ActivityWatchClient:
             event = self._get(endpoint).json()
             return Event(**event)
         except req.exceptions.HTTPError as e:
-            if e.response and e.response.status_code == 404:
+            if e.response is not None and e.response.status_code == 404:
                 return None
             else:
                 raise
@@ -509,12 +510,12 @@ class RequestQueue(threading.Thread):
             sleep(0.5)
             return
         except req.RequestException as e:
-            if e.response and e.response.status_code == 400:
+            if e.response is not None and e.response.status_code == 400:
                 # HTTP 400 - Bad request
                 # Example case: https://github.com/ActivityWatch/activitywatch/issues/815
                 # We don't want to retry, because a bad payload is likely to fail forever.
                 logger.error(f"Bad request, not retrying: {request.data}")
-            elif e.response and e.response.status_code == 500:
+            elif e.response is not None and e.response.status_code == 500:
                 # HTTP 500 - Internal server error
                 # It is possible that the server is in a bad state (and will recover on restart),
                 # in which case we want to retry. I hope this can never caused by a bad payload.
